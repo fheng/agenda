@@ -1,0 +1,132 @@
+{
+  "name": "fh-agenda",
+  "version": "0.2.0",
+  "dependencies": {
+    "cron": {
+      "version": "1.0.9",
+      "from": "cron@~1.0.1",
+      "resolved": "https://registry.npmjs.org/cron/-/cron-1.0.9.tgz",
+      "dependencies": {
+        "moment-timezone": {
+          "version": "0.3.1",
+          "from": "moment-timezone@~0.3.0",
+          "resolved": "https://registry.npmjs.org/moment-timezone/-/moment-timezone-0.3.1.tgz",
+          "dependencies": {
+            "moment": {
+              "version": "2.13.0",
+              "from": "moment@>= 2.6.0",
+              "resolved": "https://registry.npmjs.org/moment/-/moment-2.13.0.tgz"
+            }
+          }
+        }
+      }
+    },
+    "date.js": {
+      "version": "0.2.2",
+      "from": "date.js@~0.2.0",
+      "resolved": "https://registry.npmjs.org/date.js/-/date.js-0.2.2.tgz",
+      "dependencies": {
+        "debug": {
+          "version": "0.7.4",
+          "from": "debug@~0.7.2",
+          "resolved": "http://npm.skunkhenry.com/debug/-/debug-0.7.4.tgz"
+        }
+      }
+    },
+    "human-interval": {
+      "version": "0.1.6",
+      "from": "human-interval@~0.1.3",
+      "resolved": "https://registry.npmjs.org/human-interval/-/human-interval-0.1.6.tgz"
+    },
+    "moment-timezone": {
+      "version": "0.5.4",
+      "from": "moment-timezone@^0.5.0",
+      "resolved": "https://registry.npmjs.org/moment-timezone/-/moment-timezone-0.5.4.tgz",
+      "dependencies": {
+        "moment": {
+          "version": "2.13.0",
+          "from": "moment@>= 2.6.0",
+          "resolved": "https://registry.npmjs.org/moment/-/moment-2.13.0.tgz"
+        }
+      }
+    },
+    "mongodb": {
+      "version": "1.4.40",
+      "from": "mongodb@~1.4",
+      "resolved": "https://registry.npmjs.org/mongodb/-/mongodb-1.4.40.tgz",
+      "dependencies": {
+        "bson": {
+          "version": "0.2.22",
+          "from": "bson@~0.2",
+          "resolved": "https://registry.npmjs.org/bson/-/bson-0.2.22.tgz",
+          "dependencies": {
+            "nan": {
+              "version": "1.8.4",
+              "from": "nan@~1.8",
+              "resolved": "https://registry.npmjs.org/nan/-/nan-1.8.4.tgz"
+            }
+          }
+        },
+        "kerberos": {
+          "version": "0.0.11",
+          "from": "kerberos@0.0.11",
+          "resolved": "https://registry.npmjs.org/kerberos/-/kerberos-0.0.11.tgz",
+          "dependencies": {
+            "nan": {
+              "version": "1.8.4",
+              "from": "nan@~1.8",
+              "resolved": "https://registry.npmjs.org/nan/-/nan-1.8.4.tgz"
+            }
+          }
+        },
+        "readable-stream": {
+          "version": "2.1.3",
+          "from": "readable-stream@latest",
+          "resolved": "https://registry.npmjs.org/readable-stream/-/readable-stream-2.1.3.tgz",
+          "dependencies": {
+            "buffer-shims": {
+              "version": "1.0.0",
+              "from": "buffer-shims@^1.0.0",
+              "resolved": "https://registry.npmjs.org/buffer-shims/-/buffer-shims-1.0.0.tgz"
+            },
+            "core-util-is": {
+              "version": "1.0.2",
+              "from": "core-util-is@~1.0.0",
+              "resolved": "https://registry.npmjs.org/core-util-is/-/core-util-is-1.0.2.tgz"
+            },
+            "inherits": {
+              "version": "2.0.1",
+              "from": "inherits@~2.0.1",
+              "resolved": "https://registry.npmjs.org/inherits/-/inherits-2.0.1.tgz"
+            },
+            "isarray": {
+              "version": "1.0.0",
+              "from": "isarray@~1.0.0",
+              "resolved": "https://registry.npmjs.org/isarray/-/isarray-1.0.0.tgz"
+            },
+            "process-nextick-args": {
+              "version": "1.0.7",
+              "from": "process-nextick-args@~1.0.6",
+              "resolved": "https://registry.npmjs.org/process-nextick-args/-/process-nextick-args-1.0.7.tgz"
+            },
+            "string_decoder": {
+              "version": "0.10.31",
+              "from": "string_decoder@~0.10.x",
+              "resolved": "https://registry.npmjs.org/string_decoder/-/string_decoder-0.10.31.tgz"
+            },
+            "util-deprecate": {
+              "version": "1.0.2",
+              "from": "util-deprecate@~1.0.1",
+              "resolved": "https://registry.npmjs.org/util-deprecate/-/util-deprecate-1.0.2.tgz"
+            }
+          }
+        }
+      }
+    },
+    "mongoskin": {
+      "version": "1.4.13",
+      "from": "mongoskin@~1.4.1",
+      "resolved": "https://registry.npmjs.org/mongoskin/-/mongoskin-1.4.13.tgz"
+    }
+  }
+}
