@@ -1,6 +1,6 @@
 {
   "name": "fh-agenda",
-  "version": "0.2.0",
+  "version": "0.2.2",
   "dependencies": {
     "cron": {
       "version": "1.0.9",
@@ -29,7 +29,7 @@
         "debug": {
           "version": "0.7.4",
           "from": "debug@~0.7.2",
-          "resolved": "http://npm.skunkhenry.com/debug/-/debug-0.7.4.tgz"
+          "resolved": "https://registry.npmjs.org/debug/-/debug-0.7.4.tgz"
         }
       }
     },
