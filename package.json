@@ -1,6 +1,6 @@
 {
   "name": "fh-agenda",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Temporary Clone Of Agenda To Fix A Concurrency Bug. Do Not Use This.",
   "main": "index.js",
   "scripts": {
