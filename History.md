@@ -1,3 +1,78 @@
+0.9.0 / 2016-06-07
+==================
+  * Upgrade mongo driver to 2.1.11
+  * Increase Mongo compatability to 2.4
+
+0.8.1 / 2016-05-08
+==================
+
+  * Add Node v6 to CI
+  * 1. Update dev dependencies for out of date. 2. Small fix to job.js for invalid repeatAt
+  * Update .npmignore
+  * Fix doc: cb not marked as optional (closes #279)
+  * Including nextRunAt check in query for on the fly lock.
+  * Picking up any job with an expired lock (not just recurring or queued).
+  * Fixed failing test
+  * throw on processJobResult error
+  * Requeuing concurrency blocked jobs wrt priority.
+  * Processing the next job that is not blocked by concurrency.
+  * Fix test which fails only sometimes
+  * Add agendash as alternative ui
+  * Merge pull request #288 from diesal11/master
+
+0.8.0 / 2016-02-21
+==================
+
+  * Implementing lock limit
+  * Use callback to handle errors if we can.
+
+0.7.9 / 2016-02-05
+==================
+
+  * fix: ReferenceError: MongoError is not defined
+
+0.7.8 / 2016-02-03
+==================
+
+  * fix: computeNextRunAt timezone bug
+
+0.7.7 / 2016-01-25
+==================
+
+  * feat: add timezone option for repeatAt.
+  * fix: job locking logic
+  * fix: bug with jobs expiring and being enqueued anyway
+  * fix: bug where jobs wouldn't run concurrently
+  * fix: agenda throwing an exception when starting a job defined on another instance
+  * fix: possible bug when using extended Array.prototype
+
+0.7.6 / 2016-01-04
+==================
+
+  * feat: Add failCount attribute to jobs
+  * fix: job priority for on the fly job lock and queueing is now respected
+  * fix: make agenda.cancel no longer require a callback
+  * fix: stale jobs running after a more up-to-date job has completed
+  * fix: fail/success event emit after jobs have been saved in the database
+  * fix: ready event when using config.mongo
+
+0.7.5 / 2015-12-05
+==================
+
+  * Adds options.insertOnly to job.unique that prevents the job from being updated multiple times on multiple runs
+
+0.7.4 / 2015-11-26
+==================
+
+  * fix job priority scheduling
+
+0.7.3 / 2015-11-22
+==================
+
+  * add support for success callbacks on schedule, every and now (@mgregson)
+  * using self for reference to collection (@3choBoomer)
+  * emit ready from db_init (@jdiamond)
+
 0.7.2 / 2015-10-22
 ==================
 

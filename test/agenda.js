@@ -5,6 +5,7 @@ var mongoHost = process.env.MONGODB_HOST || 'localhost',
 
 var expect = require('expect.js'),
     path = require('path'),
+    moment = require('moment-timezone'),
     cp = require('child_process'),
     Agenda = require( path.join('..', 'index.js') ),
     Job = require( path.join('..', 'lib', 'job.js') );
@@ -35,8 +36,7 @@ function failOnError(err) {
 
 describe("agenda", function() {
 
-  before(function(done) {
-
+  beforeEach(function(done) {
     jobs = new Agenda({
       db: {
         address: mongoCfg
@@ -59,12 +59,16 @@ describe("agenda", function() {
     });
   });
 
-  after(function(done) {
+  afterEach(function(done) {
       setTimeout(function() {
-        mongo.close(done);
+        clearJobs(function() {
+          mongo.close(function () {
+            jobs.stop();
+            jobs._mdb.close(done);
+          });
+        });
       }, 50);
   });
-
 
   describe('Agenda', function() {
     it('sets a default processEvery', function() {
@@ -130,6 +134,24 @@ describe("agenda", function() {
           expect(jobs.defaultConcurrency(5)).to.be(jobs);
         });
       });
+      describe('lockLimit', function() {
+        it('sets the lockLimit', function() {
+          jobs.lockLimit(10);
+          expect(jobs._lockLimit).to.be(10);
+        });
+        it('returns itself', function() {
+          expect(jobs.lockLimit(10)).to.be(jobs);
+        });
+      });
+      describe('defaultLockLimit', function() {
+        it('sets the defaultLockLimit', function() {
+          jobs.defaultLockLimit(1);
+          expect(jobs._defaultLockLimit).to.be(1);
+        });
+        it('returns itself', function() {
+          expect(jobs.defaultLockLimit(5)).to.be(jobs);
+        });
+      });
       describe('defaultLockLifetime', function(){
         it('returns itself', function() {
           expect(jobs.defaultLockLifetime(1000)).to.be(jobs);
@@ -181,6 +203,10 @@ describe("agenda", function() {
           expect(jobs._definitions.someJob).to.have.property('concurrency', 5);
         });
 
+        it('sets the default lockLimit for the job', function() {
+          expect(jobs._definitions.someJob).to.have.property('lockLimit', 0);
+        });
+
         it('sets the default priority for the job', function() {
           expect(jobs._definitions.someJob).to.have.property('priority', 0);
         });
@@ -222,7 +248,6 @@ describe("agenda", function() {
             expect(jobs.every('5 minutes', ['send email', 'some job'])).to.be.an('array');
           });
         });
-        after(clearJobs);
       });
 
       describe('schedule', function() {
@@ -240,26 +265,37 @@ describe("agenda", function() {
             expect(jobs.schedule('5 minutes', ['send email', 'some job'])).to.be.an('array');
           });
         });
-        after(clearJobs);
       });
 
       describe('unique', function() {
 
         describe('should demonstrate unique contraint', function(done) {
 
-          it('should create one job when unique matches', function(done) {
-            var time = new Date();
-            jobs.create('unique job', {type: 'active', userId: '123', 'other': true}).unique({'data.type': 'active', 'data.userId': '123', nextRunAt: time}).schedule(time).save(function(err, job) {
-             jobs.create('unique job', {type: 'active', userId: '123', 'other': false}).unique({'data.type': 'active', 'data.userId': '123', nextRunAt: time}).schedule(time).save(function(err, job) {
+          it('should modify one job when unique matches', function(done) {
+            jobs.create('unique job', {type: 'active', userId: '123', 'other': true}).unique({'data.type': 'active', 'data.userId': '123'}).schedule("now").save(function(err, job1) {
+              setTimeout(function() { // Avoid timing condition where nextRunAt coincidentally is the same
+                jobs.create('unique job', {type: 'active', userId: '123', 'other': false}).unique({'data.type': 'active', 'data.userId': '123'}).schedule("now").save(function(err, job2) {
+                  expect(job1.attrs.nextRunAt.toISOString()).not.to.equal(job2.attrs.nextRunAt.toISOString())
+                  mongo.collection('agendaJobs').find({name: 'unique job'}).toArray(function(err, j) {
+                    expect(j).to.have.length(1);
+                    done();
+                  });
+                });
+              }, 1);
+            });
+          });
+
+          it('should not modify job when unique matches and insertOnly is set to true', function(done) {
+            jobs.create('unique job', {type: 'active', userId: '123', 'other': true}).unique({'data.type': 'active', 'data.userId': '123'}, { insertOnly: true }).schedule("now").save(function(err, job1) {
+              jobs.create('unique job', {type: 'active', userId: '123', 'other': false}).unique({'data.type': 'active', 'data.userId': '123'}, {insertOnly: true}).schedule("now").save(function(err, job2) {
+                expect(job1.attrs.nextRunAt.toISOString()).to.equal(job2.attrs.nextRunAt.toISOString())
                 mongo.collection('agendaJobs').find({name: 'unique job'}).toArray(function(err, j) {
                   expect(j).to.have.length(1);
                   done();
                 });
-             });
+              });
             });
           });
-          after(clearJobs);
-
         });
 
         describe('should demonstrate non-unique contraint', function(done) {
@@ -278,8 +314,6 @@ describe("agenda", function() {
             });
 
           });
-          after(clearJobs);
-
         });
 
       });
@@ -301,8 +335,6 @@ describe("agenda", function() {
           jobs.now('immediateJob');
           jobs.start();
         });
-
-        after(clearJobs);
       });
 
       describe('jobs', function() {
@@ -549,6 +581,28 @@ describe("agenda", function() {
         expect(job.attrs.nextRunAt.valueOf()).to.be(now.valueOf() + 60000);
       });
 
+      it('understands cron intervals with a timezone', function () {
+        var date = new Date('2015-01-01T06:01:00-00:00');
+        job.attrs.lastRunAt = date;
+        job.repeatEvery('0 6 * * *', {
+          timezone: 'GMT'
+        });
+        job.computeNextRunAt();
+        expect(moment(job.attrs.nextRunAt).tz('GMT').hour()).to.be(6);
+        expect(moment(job.attrs.nextRunAt).toDate().getDate()).to.be(moment(job.attrs.lastRunAt).add(1, 'days').toDate().getDate());
+      });
+
+      it('understands cron intervals with a timezone when last run is the same as the interval', function () {
+        var date = new Date('2015-01-01T06:00:00-00:00');
+        job.attrs.lastRunAt = date;
+        job.repeatEvery('0 6 * * *', {
+          timezone: 'GMT'
+        });
+        job.computeNextRunAt();
+        expect(moment(job.attrs.nextRunAt).tz('GMT').hour()).to.be(6);
+        expect(moment(job.attrs.nextRunAt).toDate().getDate()).to.be(moment(job.attrs.lastRunAt).add(1, 'days').toDate().getDate());
+      });
+
       describe('when repeat at time is invalid', function () {
         beforeEach(function () {
           try {
@@ -604,15 +658,13 @@ describe("agenda", function() {
     describe('run', function() {
       var job;
 
-      before(function() {
+      beforeEach(function() {
         jobs.define('testRun', function(job, done) {
           setTimeout(function() {
             done();
           }, 100);
         });
-      });
 
-      beforeEach(function() {
         job = new Job({agenda: jobs, name: 'testRun'});
       });
 
@@ -820,6 +872,19 @@ describe("agenda", function() {
         });
       });
 
+      it('does not throw an error trying to process undefined jobs', function(done) {
+        jobs.start();
+        var job = jobs.create('jobDefinedOnAnotherServer').schedule('now');
+
+        job.save(function(err) {
+          expect(err).to.be(null);
+        });
+
+        setTimeout(function() {
+          jobs.stop(done);
+        }, jobTimeout);
+      });
+
       it('clears locks on stop', function(done) {
         jobs.define('longRunningJob', function(job, cb) {
           //Job never finishes
@@ -838,7 +903,15 @@ describe("agenda", function() {
       });
 
       describe('events', function() {
-        beforeEach(clearJobs);
+        beforeEach(function() {
+          jobs.define('jobQueueTest', function jobQueueTest(job, cb) {
+            cb();
+          });
+          jobs.define('failBoat', function(job, cb) {
+            throw(new Error("Zomg fail"));
+          });
+        });
+
         it('emits start event', function(done) {
           var job = new Job({agenda: jobs, name: 'jobQueueTest'});
           jobs.once('start', function(j) {
@@ -858,7 +931,7 @@ describe("agenda", function() {
         it('emits complete event', function(done) {
           var job = new Job({agenda: jobs, name: 'jobQueueTest'});
           jobs.once('complete', function(j) {
-            expect(j).to.be(job);
+            expect(job.attrs._id.toString()).to.be(j.attrs._id.toString());
             done();
           });
           job.run();
@@ -866,7 +939,7 @@ describe("agenda", function() {
         it('emits complete:job name event', function(done) {
           var job = new Job({agenda: jobs, name: 'jobQueueTest'});
           jobs.once('complete:jobQueueTest', function(j) {
-            expect(j).to.be(job);
+            expect(job.attrs._id.toString()).to.be(j.attrs._id.toString());
             done();
           });
           job.run();
@@ -892,7 +965,15 @@ describe("agenda", function() {
           jobs.once('fail', function(err, j) {
             expect(err.message).to.be('Zomg fail');
             expect(j).to.be(job);
-            done();
+            expect(j.attrs.failCount).to.be(1);
+            expect(j.attrs.failedAt.valueOf()).not.to.be.below(j.attrs.lastFinishedAt.valueOf());
+
+            jobs.once('fail', function(err, j) {
+              expect(j).to.be(job);
+              expect(j.attrs.failCount).to.be(2);
+              done();
+            });
+            job.run();
           });
           job.run();
         });
@@ -910,7 +991,7 @@ describe("agenda", function() {
 
     describe("job lock", function(){
 
-      it("runs job after a lock has expired", function(done) {
+      it("runs a recurring job after a lock has expired", function(done) {
         var startCounter = 0;
 
         jobs.define("lock job", {lockLifetime: 50}, function(job, cb){
@@ -931,16 +1012,185 @@ describe("agenda", function() {
         jobs.start();
       });
 
+      it('runs a one-time job after its lock expires', function (done) {
+        var runCount = 0;
+
+        jobs.define('lock job', {
+          lockLifetime: 50
+        }, function (job, cb) {
+          runCount++;
+
+          if(runCount !== 1) {
+            expect(runCount).to.be(2);
+            jobs.stop(done);
+          }
+        });
+
+        jobs.processEvery(50);
+        jobs.start();
+        jobs.now('lock job', { i: 1 });
+      });
+
+      it('does not process locked jobs', function(done) {
+        var history = [];
+
+        jobs.define('lock job', {
+          lockLifetime: 300
+        }, function(job, cb) {
+          history.push(job.attrs.data.i);
+
+          setTimeout(function() {
+            cb();
+          }, 150);
+        });
+
+        jobs.start();
+
+        jobs.now('lock job', { i: 1 });
+        jobs.now('lock job', { i: 2 });
+        jobs.now('lock job', { i: 3 });
+
+        setTimeout(function() {
+          expect(history).to.have.length(3);
+          expect(history).to.contain(1);
+          expect(history).to.contain(2);
+          expect(history).to.contain(3);
+          done();
+        }, 500);
+      });
+
+      it('does not on-the-fly lock more than agenda._lockLimit jobs', function (done) {
+        jobs.lockLimit(1);
+
+        jobs.define('lock job', function (job, cb) {});
+
+        jobs.start();
+
+        setTimeout(function () {
+          jobs.now('lock job', { i: 1 });
+          jobs.now('lock job', { i: 2 });
+
+          setTimeout(function () {
+            expect(jobs._lockedJobs).to.have.length(1);
+            jobs.stop(done);
+          }, 500);
+        }, 500);
+      });
+
+      it('does not on-the-fly lock more than definition.lockLimit jobs', function (done) {
+        jobs.define('lock job', {
+          lockLimit: 1
+        }, function (job, cb) {});
+
+        jobs.start();
+
+        setTimeout(function () {
+          jobs.now('lock job', { i: 1 });
+          jobs.now('lock job', { i: 2 });
+
+          setTimeout(function () {
+            expect(jobs._lockedJobs).to.have.length(1);
+            jobs.stop(done);
+          }, 500);
+        }, 500);
+      });
+
+      it('does not lock more than agenda._lockLimit jobs during processing interval', function (done) {
+        jobs.lockLimit(1);
+        jobs.processEvery(200);
+
+        jobs.define('lock job', function (job, cb) {});
+
+        jobs.start();
+
+        var when = moment().add(300, 'ms').toDate();
+
+        jobs.schedule(when, 'lock job', { i: 1 });
+        jobs.schedule(when, 'lock job', { i: 2 });
+
+        setTimeout(function () {
+          expect(jobs._lockedJobs).to.have.length(1);
+          jobs.stop(done);
+        }, 500);
+      });
+
+      it('does not lock more than definition.lockLimit jobs during processing interval', function (done) {
+        jobs.processEvery(200);
+
+        jobs.define('lock job', {
+          lockLimit: 1
+        }, function (job, cb) {});
+
+        jobs.start();
+
+        var when = moment().add(300, 'ms').toDate();
+
+        jobs.schedule(when, 'lock job', { i: 1 });
+        jobs.schedule(when, 'lock job', { i: 2 });
+
+        setTimeout(function () {
+          expect(jobs._lockedJobs).to.have.length(1);
+          jobs.stop(done);
+        }, 500);
+      });
+
+    });
+
+    describe('job concurrency', function () {
+
+      it('should not block a job for concurrency of another job', function (done) {
+        jobs.processEvery(50);
+
+        var processed = [];
+        var now = Date.now();
+
+        jobs.define('blocking', {
+          concurrency: 1
+        }, function (job, cb) {
+          processed.push(job.attrs.data.i);
+          setTimeout(cb, 400);
+        });
+
+        jobs.define('non-blocking', {
+          // Lower priority to keep it at the back in the queue
+          priority: 'lowest'
+        }, function (job) {
+          processed.push(job.attrs.data.i);
+          expect(processed).not.to.contain(2);
+        });
+
+        var finished = false;
+        jobs.on('complete', function (job) {
+          if(!finished && processed.length === 3) {
+            finished = true;
+            done();
+          }
+        });
+
+        jobs.on('fail', function (err, job) {
+          expect(err).to.be(undefined);
+        })
+
+        jobs.start();
+
+        jobs.schedule(new Date(now + 100), 'blocking', { i: 1 });
+
+        setTimeout(function () {
+          jobs.schedule(new Date(now + 100), 'blocking', { i: 2 });
+          jobs.schedule(new Date(now + 100), 'non-blocking', { i: 3 });
+        }, 100);
+      });
+
     });
 
     describe("every running", function() {
-      before(function(done) {
+      beforeEach(function(done) {
         jobs.defaultConcurrency(1);
         jobs.processEvery(5);
 
         jobs.stop(done);
-
       });
+
       it('should run the same job multiple times', function(done) {
         var counter = 0;
 
@@ -1055,18 +1305,18 @@ describe("agenda", function() {
 
           var job = jobs.every(10, 'everyDisabledTest');
 
-          jobs.start();
-
           job.disable();
 
-          job.save();
+          job.save(function() {
+            jobs.start();
 
-          setTimeout(function() {
-            jobs.jobs({name: 'everyDisabledTest'}, function(err, res) {
-              expect(counter).to.be(0);
-              jobs.stop(done);
-            });
-          }, jobTimeout);
+            setTimeout(function() {
+              jobs.jobs({name: 'everyDisabledTest'}, function(err, res) {
+                expect(counter).to.be(0);
+                jobs.stop(done);
+              });
+            }, jobTimeout);
+          });
         });
 
       });
@@ -1169,8 +1419,63 @@ describe("agenda", function() {
         });
 
       });
+
+      describe('General Integration', function () {
+
+        it('Should not run a job that has already been run', function (done) {
+          var runCount = {};
+
+          jobs.define('test-job', function (job, cb) {
+            var id = job.attrs._id.toString();
+            runCount[id] = runCount[id] ? runCount[id] + 1 : 1;
+            cb();
+          });
+
+          jobs.start();
+
+          for(var i = 0; i < 10; i ++) {
+            jobs.now('test-job');
+          }
+
+          setTimeout(function () {
+            var ids = Object.keys(runCount);
+            expect(ids).to.have.length(10);
+            Object.keys(runCount).forEach(function (id) {
+              expect(runCount[id]).to.be(1);
+            })
+            done();
+          }, jobTimeout);
+        });
+      });
+    });
+
+  });
+
+  describe('Retry', function () {
+    it('should retry a job', function(done) {
+      var shouldFail = true;
+      jobs.define('a job', function (job, done) {
+        if(shouldFail) {
+          shouldFail = false;
+          return done(new Error('test failure'));
+        }
+        done();
+      });
+
+      jobs.on('fail:a job', function (err, job) {
+        job
+          .schedule('now')
+          .save();
+      });
+
+      jobs.on('success:a job', function () {
+        done();
+      });
+
+      jobs.now('a job');
+
+      jobs.start();
     });
   });
 
 });
-

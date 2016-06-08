@@ -14,7 +14,7 @@ It offers:
 - Scheduling with configurable priority, concurrency, and repeating
 - Scheduling via cron or human readable syntax.
 - Event backed job queue that you can hook into.
-- Optional standalone web-interface (see [agenda-ui](https://github.com/moudy/agenda-ui))
+- Optional standalone web-interfaces (see [agendash](https://github.com/joeframbach/agendash) and [agenda-ui](https://github.com/moudy/agenda-ui))
 
 
 # Installation
@@ -37,7 +37,7 @@ var agenda = new Agenda({db: {address: mongoConnectionString}});
 // var agenda = new Agenda({db: {address: mongoConnectionString, collection: "jobCollectionName"}});
 
 // or pass additional connection options:
-// var agenda = new Agenda({db: {address: mongoConnectionString, collection: "jobCollectionName", options: {server:{auto_reconnect:true}}});
+// var agenda = new Agenda({db: {address: mongoConnectionString, collection: "jobCollectionName", options: {server:{auto_reconnect:true}}}});
 
 // or pass in an existing mongodb-native MongoClient instance
 // var agenda = new Agenda({mongo: myMongoClient});
@@ -48,7 +48,7 @@ agenda.define('delete old users', function(job, done) {
 
 agenda.on('ready', function() {
   agenda.every('3 minutes', 'delete old users');
-  
+
   // Alternatively, you could also do:
   agenda.every('*/3 * * * *', 'delete old users');
 
@@ -230,7 +230,7 @@ var agenda = new Agenda({maxConcurrency: 20});
 
 ### defaultConcurrency(number)
 
-Takes a `number` which specifies the default number of a specific that can be running at
+Takes a `number` which specifies the default number of a specific job that can be running at
 any given moment. By default it is `5`.
 
 ```js
@@ -241,6 +241,34 @@ You can also specify it during instantiation
 
 ```js
 var agenda = new Agenda({defaultConcurrency: 5});
+```
+
+### lockLimit(number)
+
+Takes a `number` which specifies the max number jobs that can be locked at any given moment. By default it is `0` for no max.
+
+```js
+agenda.lockLimit(0);
+```
+
+You can also specify it during instantiation
+
+```js
+var agenda = new Agenda({lockLimit: 0});
+```
+
+### defaultLockLimit(number)
+
+Takes a `number` which specifies the default number of a specific job that can be locked at any given moment. By default it is `0` for no max.
+
+```js
+agenda.defaultLockLimit(0);
+```
+
+You can also specify it during instantiation
+
+```js
+var agenda = new Agenda({defaultLockLimit: 0});
 ```
 
 ### defaultLockLifetime(number)
@@ -281,7 +309,7 @@ Before you can use a job, you must define its processing behavior.
 
 ### define(jobName, [options], fn)
 
-Defines a job with the name of `jobName`. When a job of job name gets run, it
+Defines a job with the name of `jobName`. When a job of `jobName` gets run, it
 will be passed to `fn(job, done)`. To maintain asynchronous behavior, you must
 call `done()` when you are processing the job. If your function is synchronous,
 you may omit `done` from the signature.
@@ -289,7 +317,8 @@ you may omit `done` from the signature.
 `options` is an optional argument which can overwrite the defaults. It can take
 the following:
 
-- `concurrency`: `number` maxinum number of that job that can be running at once (per instance of agenda)
+- `concurrency`: `number` maximum number of that job that can be running at once (per instance of agenda)
+- `lockLimit`: `number` maximum number of that job that can be locked at once (per instance of agenda)
 - `lockLifetime`: `number` interval in ms of how long the job stays locked for (see [multiple job processors](#multiple-job-processors) for more info).
 A job will automatically unlock if `done()` is called.
 - `priority`: `(lowest|low|normal|high|highest|number)` specifies the priority
@@ -328,9 +357,9 @@ agenda.define('say hello', function(job) {
 
 ## Creating Jobs
 
-### every(interval, name, [data])
+### every(interval, name, [data], [options], [cb])
 
-Runs job `name` at the given `interval`. Optionally, data can be passed in.
+Runs job `name` at the given `interval`. Optionally, data and options can be passed in.
 Every creates a job of type `single`, which means that it will only create one
 job in the database, even if that line is run multiple times. This lets you put
 it in a file that may get run multiple times, such as `webserver.js` which may
@@ -340,6 +369,13 @@ reboot from time to time.
 
 `data` is an optional argument that will be passed to the processing function
 under `job.attrs.data`.
+
+`options` is an optional argument that will be passed to `job.repeatEvery`. In order to use
+this argument, `data` must also be specified.
+
+`cb` is an optional callback function which will be called when the job has been
+persisted in the database.
+
 
 Returns the `job`.
 
@@ -364,13 +400,16 @@ agenda.every('15 minutes', ['printAnalyticsReport', 'sendNotifications', 'update
 
 In this case, `every` returns array of `jobs`.
 
-### schedule(when, name, data)
+### schedule(when, name, [data], [cb])
 
 Schedules a job to run `name` once at a given time. `when` can be a `Date` or a
 `String` such as `tomorrow at 5pm`.
 
 `data` is an optional argument that will be passed to the processing function
 under `job.attrs.data`.
+
+`cb` is an optional callback function which will be called when the job has been
+persisted in the database.
 
 Returns the `job`.
 
@@ -386,12 +425,15 @@ agenda.schedule('tomorrow at noon', ['printAnalyticsReport', 'sendNotifications'
 
 In this case, `schedule` returns array of `jobs`.
 
-### now(name, data)
+### now(name, [data], [cb])
 
 Schedules a job to run `name` once immediately.
 
 `data` is an optional argument that will be passed to the processing function
 under `job.attrs.data`.
+
+`cb` is an optional callback function which will be called when the job has been
+persisted in the database.
 
 Returns the `job`.
 
@@ -508,14 +550,25 @@ A job instance has many instance methods. All mutating methods must be followed
 with a call to `job.save()` in order to persist the changes to the database.
 
 
-### repeatEvery(interval)
+### repeatEvery(interval, [options])
 
 Specifies an `interval` on which the job should repeat.
 
 `interval` can be a human-readable format `String`, a cron format `String`, or a `Number`.
 
+`options` is an optional argument that can include a `timezone` field. The timezone should
+be a string as accepted by [moment-timezone](http://momentjs.com/timezone/) and is considered
+when using an interval in the cron string format.
+
 ```js
 job.repeatEvery('10 minutes');
+job.save();
+```
+
+```js
+job.repeatEvery('0 6 * * *', {
+  timezone: 'America/New_York'
+});
 job.save();
 ```
 
@@ -547,9 +600,14 @@ job.priority('low');
 job.save();
 ```
 
-### unique(properties)
+### unique(properties, [options])
 
 Ensure that only one instance of this job exists with the specified properties
+
+`options` is an optional argument which can overwrite the defaults. It can take
+the following:
+
+- `insertOnly`: `boolean` will prevent any properties from persisting if job already exists. Defaults to false.
 
 ```js
 job.unique({'data.type': 'active', 'data.userId': '123', nextRunAt(date)});
@@ -676,11 +734,12 @@ Thanks! I'm flattered, but it's really not necessary. If you really want to, you
 
 ### Web Interface?
 
-Agenda itself does not have a web interface built in. That being said, there is a stand-alone web interface in the form of [agenda-ui](https://github.com/moudy/agenda-ui).
+Agenda itself does not have a web interface built in. That being said, there are two stand-alone web interfaces:
 
-Screenshot:
-
-![agenda-ui interface](https://raw.githubusercontent.com/moudy/agenda-ui/screenshot/agenda-ui-screenshot.png)
+- [agendash](https://github.com/joeframbach/agendash)
+  ![agendash interface](https://raw.githubusercontent.com/joeframbach/agendash/master/job-details.png)
+- [agenda-ui](https://github.com/moudy/agenda-ui)
+  ![agenda-ui interface](https://raw.githubusercontent.com/moudy/agenda-ui/screenshot/agenda-ui-screenshot.png)
 
 ### Mongo vs Redis
 
@@ -882,6 +941,8 @@ Agenda has some great community members that help a great deal.
 - [@droppedoncaprica](http://github.com/droppedoncaprica)
 - [@nwkeeley](http://github.com/nwkeeley)
 - [@liamdon](http://github.com/liamdon)
+- [@loris](http://github.com/loris)
+- [@jakeorr](http://github.com/jakeorr)
 
 
 # License
