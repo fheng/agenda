@@ -1,6 +1,6 @@
 {
   "name": "fh-agenda",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "description": "Temporary Clone Of Agenda To Work With Mongo 2.4. Do Not Use This.",
   "main": "index.js",
   "scripts": {
